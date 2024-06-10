@@ -63,6 +63,9 @@ const dataSource = new DataSourceBuilder()
       digest: true,
     },
   })
+  .setBlockRange({
+    from: 0,
+  })
 
   .addReceipt({
     type: ["LOG_DATA"],
@@ -118,8 +121,6 @@ run(dataSource, database, async (ctx) => {
       logs.map(async (log: any) => {
         // MarketCreateEvent
         if (isEvent("MarketCreateEvent", log, abi)) {
-          console.log("MarketCreateEvent");
-          console.log(log);
           const idSource = `${log.asset_decimals}-${
             log.asset_id.bits
           }-${tai64ToDate(log.timestamp)}-${log.tx_id}`;
@@ -148,21 +149,30 @@ run(dataSource, database, async (ctx) => {
             newBaseSize: log.new_base_size,
             identifier: log.identifier,
           });
+
+          let spotOrder = undefined;
           if (log.order) {
             let order = log.order;
-            let spotOrder = new SpotOrder({
+            spotOrder = new SpotOrder({
               id: order.id,
               trader: order.trader.bits,
               baseToken: order.base_token.bits,
-              baseSize: order.base_size.value,
-              basePrice: order.base_price,
+              baseSize: order.base_size.toString(),
+              basePrice: order.base_price.toString(),
               timestamp: tai64ToDate(log.timestamp).toString(),
             });
             orders.set(order.id, spotOrder);
-            // await ctx.store.upsert(spotOrder);
+
+            //await ctx.store.upsert(spotOrder);
             //console.log(spotOrder);
           }
+          if (spotOrder) {
+            console.log("spotOrder");
+
+            // await ctx.store.save(spotOrder);
+          }
           //console.log(event);
+
           await ctx.store.upsert(event);
           orderChangeEvents.push(event);
         }
@@ -197,7 +207,7 @@ run(dataSource, database, async (ctx) => {
       console.error(e);
     }
 
-    // await ctx.store.upsert([...orders.values()]);
+    await ctx.store.upsert([...orders.values()]);
     // await ctx.store.upsert(createEvents);
     // await ctx.store.upsert(orderChangeEvents);
     // await ctx.store.upsert(tradeEvents);
