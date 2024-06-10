@@ -8,6 +8,7 @@ This project shows how one can index Fuel network using Subsquid SDK.
 
 * Node.js (version 20.x and above)
 * Docker
+* `sqd` [CLI tool](https://docs.subsquid.io/squid-cli/installation/)
 
 ### Run indexer
 
