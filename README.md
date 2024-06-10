@@ -16,20 +16,23 @@ This project shows how one can index Fuel network using Subsquid SDK.
 npm ci
 
 # Compile the project
-npx tsc
+sqd build
 
 # Launch Postgres database to store the data
-docker compose up -d
+sqd up
 
-# Apply database migrations to create the target schema
-npx squid-typeorm-migration apply
+# Generate database migrations to create the target schema
+sqd migration:generate
 
 # Run indexer
-node -r dotenv/config lib/main.js
+sqd process
 
 # Checkout indexed swaps
 docker exec "$(basename "$(pwd)")-db-1" psql -U postgres \
   -c "SELECT id, logs_count, found_at FROM contract ORDER BY logs_count desc LIMIT 10"
+
+# Start graphQL server 
+sqd serve
 ```
 
 For further details please consult heavily commented [main.ts](./src/main.ts).
