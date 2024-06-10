@@ -26,6 +26,7 @@ import {
   SpotMarketCreateEvent,
   SpotOrder,
   SpotOrderChangeEvent,
+  SpotOrderType,
   SpotTradeEvent,
 } from "./model";
 import isEvent from "./utils/isEvent";
@@ -152,28 +153,41 @@ run(dataSource, database, async (ctx) => {
 
           let spotOrder = undefined;
           if (log.order) {
-            let order = log.order;
-            spotOrder = new SpotOrder({
-              id: order.id,
-              trader: order.trader.bits,
-              baseToken: order.base_token.bits,
-              baseSize: order.base_size.toString(),
-              basePrice: order.base_price.toString(),
-              timestamp: tai64ToDate(log.timestamp).toString(),
-            });
-            orders.set(order.id, spotOrder);
-
-            //await ctx.store.upsert(spotOrder);
-            //console.log(spotOrder);
+            let existingOrder = await ctx.store.get(SpotOrder, log.order.id);
+            if (existingOrder) {
+              spotOrder = existingOrder;
+              spotOrder.baseSize = log.order.base_size.value.toString();
+              orders.set(log.order.id, spotOrder);
+            } else {
+              let order = log.order;
+              console.log("order");
+              console.log(order);
+              spotOrder = new SpotOrder({
+                id: order.id,
+                trader: order.trader.bits,
+                baseToken: order.base_token.bits,
+                baseSize: order.base_size.value.toString(),
+                basePrice: order.base_price.toString(),
+                timestamp: tai64ToDate(log.timestamp).toString(),
+                orderType:
+                  order.base_size === 0n
+                    ? undefined
+                    : order.base_size.negative
+                    ? SpotOrderType.sell
+                    : SpotOrderType.buy,
+              });
+              //console.log("spotOrder");
+              // console.log(spotOrder);
+              orders.set(order.id, spotOrder);
+            }
           }
-          if (spotOrder) {
-            console.log("spotOrder");
 
-            // await ctx.store.save(spotOrder);
-          }
+          //await ctx.store.upsert(spotOrder);
+          console.log(spotOrder);
+
           //console.log(event);
 
-          await ctx.store.upsert(event);
+          //await ctx.store.upsert(event);
           orderChangeEvents.push(event);
         }
         // TradeEvent
@@ -200,7 +214,7 @@ run(dataSource, database, async (ctx) => {
           });
           // console.log(event);
           tradeEvents.push(event);
-          await ctx.store.upsert(event);
+          //await ctx.store.upsert(event);
         }
       });
     } catch (e) {
@@ -209,7 +223,7 @@ run(dataSource, database, async (ctx) => {
 
     await ctx.store.upsert([...orders.values()]);
     // await ctx.store.upsert(createEvents);
-    // await ctx.store.upsert(orderChangeEvents);
-    // await ctx.store.upsert(tradeEvents);
+    await ctx.store.upsert(orderChangeEvents);
+    await ctx.store.upsert(tradeEvents);
   }
 });
