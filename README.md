@@ -6,9 +6,9 @@ This project shows how one can index Fuel network using Subsquid SDK.
 
 ### Prerequisites
 
-* Node.js (version 20.x and above)
-* Docker
-* `sqd` [CLI tool](https://docs.subsquid.io/squid-cli/installation/)
+- Node.js (version 20.x and above)
+- Docker
+- `sqd` [CLI tool](https://docs.subsquid.io/squid-cli/installation/)
 
 ### Run indexer
 
@@ -18,6 +18,8 @@ npm ci
 
 # Compile the project
 sqd build
+
+sqd codegen
 
 # Launch Postgres database to store the data
 sqd up
@@ -32,7 +34,7 @@ sqd process
 docker exec "$(basename "$(pwd)")-db-1" psql -U postgres \
   -c "SELECT id, logs_count, found_at FROM contract ORDER BY logs_count desc LIMIT 10"
 
-# Start graphQL server 
+# Start graphQL server
 sqd serve
 ```
 

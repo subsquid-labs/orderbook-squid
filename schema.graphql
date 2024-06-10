@@ -19,6 +19,7 @@ type SpotOrderChangeEvent @entity {
 enum SpotOrderType {
   sell
   buy
+  t
 }
 
 type SpotOrder @entity {
