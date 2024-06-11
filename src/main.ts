@@ -223,7 +223,7 @@ run(dataSource, database, async (ctx) => {
     }
 
     await ctx.store.upsert([...orders.values()]);
-    // await ctx.store.upsert(createEvents);
+    await ctx.store.upsert(createEvents);
     await ctx.store.upsert(orderChangeEvents);
     await ctx.store.upsert(tradeEvents);
   }
