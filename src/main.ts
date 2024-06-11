@@ -139,6 +139,8 @@ run(dataSource, database, async (ctx) => {
         }
         // OrderChangeEvent
         if (isEvent("OrderChangeEvent", log, abi)) {
+          console.log("OrderChangeEvent");
+          console.log(log);
           const timestamp = tai64ToDate(log.timestamp);
           const idSource = `${log.tx_id}-${timestamp}-${log.order_id}`;
           const id = crypto.createHash("sha256").update(idSource).digest("hex");
@@ -160,8 +162,7 @@ run(dataSource, database, async (ctx) => {
               orders.set(log.order.id, spotOrder);
             } else {
               let order = log.order;
-              console.log("order");
-              console.log(order);
+
               spotOrder = new SpotOrder({
                 id: order.id,
                 trader: order.trader.bits,
@@ -183,7 +184,7 @@ run(dataSource, database, async (ctx) => {
           }
 
           //await ctx.store.upsert(spotOrder);
-          console.log(spotOrder);
+          //console.log(spotOrder);
 
           //console.log(event);
 
