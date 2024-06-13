@@ -1,16 +1,7 @@
-type SpotMarketCreateEvent @entity {
-  id: ID!
-  assetId: String
-  assetDecimals: Int
-  timestamp: String # Date
-  txId: String
-}
-
 type SpotOrderChangeEvent @entity {
   id: ID!
-
-  orderId: String
-  newBaseSize: String
+  order: SpotOrder!
+  newBaseSize: String!
   identifier: String
   timestamp: String # Date
   txId: ID
@@ -19,7 +10,6 @@ type SpotOrderChangeEvent @entity {
 enum SpotOrderType {
   sell
   buy
-  t
 }
 
 type SpotOrder @entity {
@@ -27,21 +17,29 @@ type SpotOrder @entity {
   orderType: SpotOrderType
   trader: String
   baseToken: String
-  baseSize: String
+  baseSize: String!
   basePrice: BigInt
   timestamp: String # Date
 }
 
+type SpotMarketCreateEvent @entity {
+  id: ID!
+  assetId: String!
+  assetDecimals: Int!
+  timestamp: String! # Date
+  txId: ID!
+}
+
 type SpotTradeEvent @entity {
   id: ID!
-  baseToken: String
-  orderMatcher: String
-  seller: String
-  buyer: String
-  tradeSize: BigInt
-  tradePrice: BigInt
-  sellOrder: String
-  buyOrder: String
-  timestamp: String # Date
-  txId: String
+  baseToken: String!
+  orderMatcher: String!
+  seller: String!
+  buyer: String!
+  tradeSize: BigInt!
+  tradePrice: BigInt!
+  sellOrder: SpotOrder!
+  buyOrder: SpotOrder!
+  timestamp: String! # Date
+  txId: ID!
 }
