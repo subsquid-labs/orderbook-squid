@@ -178,10 +178,28 @@ run(dataSource, database, async (ctx) => {
 
       if (maybeExistingOrder) {
         if (maybeExistingOrder.orderType != undefined) {
+          orders.set(maybeExistingOrder.id, {
+            ...maybeExistingOrder,
+            baseSize: log.order ? log.order.base_size.value.toString() : "0",
+            orderType:
+              eventOrder == null || eventOrder.base_size.value === 0n
+                ? undefined
+                : eventOrder.base_size.negative
+                ? SpotOrderType.sell
+                : SpotOrderType.buy,
+          });
+
           orders.set(maybeExistingOrder.id, maybeExistingOrder);
         }
       } else if (order) {
         orders.set(order.id, order);
+      }
+      if (!log.order) {
+        let zeroOrder = order ? order : maybeExistingOrder;
+        if (zeroOrder) {
+          zeroOrder.baseSize = "0";
+          orders.set(zeroOrder.id, zeroOrder);
+        }
       }
       const newSpotOrderChangeEvent: SpotOrderChangeEvent =
         new SpotOrderChangeEvent({
