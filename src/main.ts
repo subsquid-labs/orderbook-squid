@@ -198,6 +198,7 @@ run(dataSource, database, async (ctx) => {
         let zeroOrder = order ? order : maybeExistingOrder;
         if (zeroOrder) {
           zeroOrder.baseSize = "0";
+          zeroOrder.orderType = undefined;
           orders.set(zeroOrder.id, zeroOrder);
         }
       }
