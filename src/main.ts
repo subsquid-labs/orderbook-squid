@@ -162,7 +162,8 @@ run(dataSource, database, async (ctx) => {
             timestamp: tai64ToDate(log.timestamp).toString(),
           })
         : null;
-      const idSource = `${log.tx_id}-${timestamp}-${log.order_id}`;
+      let newBaseSize = order ? order.baseSize : "0";
+      const idSource = `${log.tx_id}-${timestamp}-${log.order_id}-${newBaseSize}`;
       const id = crypto.createHash("sha256").update(idSource).digest("hex");
 
       if (order) {
