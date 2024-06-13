@@ -158,7 +158,7 @@ run(dataSource, database, async (ctx) => {
                 : eventOrder.base_size.negative
                 ? SpotOrderType.sell
                 : SpotOrderType.buy,
-            basePrice: eventOrder.base_price,
+            basePrice: BigInt(eventOrder.base_price),
             timestamp: tai64ToDate(log.timestamp).toString(),
           })
         : null;
