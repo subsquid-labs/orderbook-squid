@@ -9,15 +9,15 @@ export class SpotMarketCreateEvent {
     @PrimaryColumn_()
     id!: string
 
-    @StringColumn_({nullable: true})
-    assetId!: string | undefined | null
+    @StringColumn_({nullable: false})
+    assetId!: string
 
-    @IntColumn_({nullable: true})
-    assetDecimals!: number | undefined | null
+    @IntColumn_({nullable: false})
+    assetDecimals!: number
 
-    @StringColumn_({nullable: true})
-    timestamp!: string | undefined | null
+    @StringColumn_({nullable: false})
+    timestamp!: string
 
-    @StringColumn_({nullable: true})
-    txId!: string | undefined | null
+    @StringColumn_({nullable: false})
+    txId!: string
 }

@@ -19,8 +19,8 @@ export class SpotOrder {
     @StringColumn_({nullable: true})
     baseToken!: string | undefined | null
 
-    @StringColumn_({nullable: true})
-    baseSize!: string | undefined | null
+    @StringColumn_({nullable: false})
+    baseSize!: string
 
     @BigIntColumn_({nullable: true})
     basePrice!: bigint | undefined | null

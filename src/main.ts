@@ -121,29 +121,6 @@ run(dataSource, database, async (ctx) => {
   // let createEvents: SpotMarketCreateEvent[] = [];
   logs.forEach(async (log: any) => {
     if (isEvent("OrderChangeEvent", log, abi)) {
-      // if (log.identifier == "OrderOpenEvent") {
-      //   let order = processOrder(log);
-      //   orders.set(order.id, order);
-      //   console.log("Order Open Event", order);
-      //   let event = processOrderOpenEvent(log, order);
-      //   orderOpenEvents.set(event.id, event);
-      // }
-
-      // if (log.identifier == "OrderCancelEvent") {
-      //   let order = createCancelledOrder(log);
-      //   orders.set(order.id, order);
-      //   let event = processOrderCancelEvent(log, order);
-      //   cancelEvents.set(event.id, event);
-      // }
-
-      // if (log.identifier == "OrderMatchEvent") {
-      //   // console.log("Order Match Event", log);
-      //   let order = processOrder(log);
-      //   orders.set(order.id, order);
-      //   let event = processOrderMatchEvent(log, order);
-      //   orderMatchEvents.set(event.id, event);
-      // }
-
       const eventOrder = log.order;
       const timestamp = tai64ToDate(log.timestamp);
       const order: SpotOrder | null = eventOrder
@@ -154,7 +131,7 @@ run(dataSource, database, async (ctx) => {
             baseSize: decodeI64(eventOrder.base_size),
             orderType:
               eventOrder.base_size.value === 0n
-                ? undefined
+                ? null
                 : eventOrder.base_size.negative
                 ? SpotOrderType.sell
                 : SpotOrderType.buy,
@@ -163,9 +140,19 @@ run(dataSource, database, async (ctx) => {
           })
         : null;
       let newBaseSize = order ? order.baseSize : "0";
-      const idSource = `${log.tx_id}-${timestamp}-${log.order_id}-${newBaseSize}`;
+      const idSource = `${log.tx_id}-${timestamp}-${
+        log.order_id
+      }-${newBaseSize}-${Math.random()}`;
       const id = crypto.createHash("sha256").update(idSource).digest("hex");
-
+      if (
+        log.order_id ==
+        "0x0bfdce96c5d4ab88109bcfbd4c546798d7e100badc58753185872ee8ad3f7ba2"
+      ) {
+        console.log("Order ID is 0x-");
+        console.log(log);
+        console.log("SIZE");
+        //console.log(BigInt(eventOrder.base_size.value));
+      }
       if (order) {
         orders.set(order.id, order);
       }
@@ -177,40 +164,48 @@ run(dataSource, database, async (ctx) => {
       }
 
       if (maybeExistingOrder) {
-        if (maybeExistingOrder.orderType != undefined) {
-          orders.set(maybeExistingOrder.id, {
-            ...maybeExistingOrder,
-            baseSize: log.order ? log.order.base_size.value.toString() : "0",
-            orderType:
-              eventOrder == null || eventOrder.base_size.value === 0n
-                ? undefined
-                : eventOrder.base_size.negative
-                ? SpotOrderType.sell
-                : SpotOrderType.buy,
-          });
+        let ammendedOrder = new SpotOrder({
+          id: maybeExistingOrder.id,
+          trader: maybeExistingOrder.trader,
+          baseToken: maybeExistingOrder.baseToken,
+          baseSize: newBaseSize,
+          basePrice: maybeExistingOrder.basePrice,
+          timestamp: maybeExistingOrder.timestamp,
+          orderType:
+            eventOrder == null ||
+            BigInt(eventOrder.base_size.value) === BigInt(0) ||
+            eventOrder == undefined
+              ? null
+              : eventOrder.base_size.negative
+              ? SpotOrderType.sell
+              : SpotOrderType.buy,
+        });
+        orders.set(ammendedOrder.id, ammendedOrder);
+        await ctx.store.save(ammendedOrder);
 
-          orders.set(maybeExistingOrder.id, maybeExistingOrder);
-        }
-      } else if (order) {
+        //orders.set(maybeExistingOrder.id, maybeExistingOrder);
+      } /* else if (order) {
         orders.set(order.id, order);
-      }
-      if (!log.order) {
-        let zeroOrder = order ? order : maybeExistingOrder;
-        if (zeroOrder) {
-          zeroOrder.baseSize = "0";
-          zeroOrder.orderType = undefined;
-          orders.set(zeroOrder.id, zeroOrder);
-        }
-      }
+      } */
+      // if (!log.order) {
+      //   let zeroOrder = order ? order : maybeExistingOrder;
+      //   if (zeroOrder) {
+      //     zeroOrder.baseSize = "0";
+      //     zeroOrder.orderType = undefined;
+      //     orders.set(zeroOrder.id, zeroOrder);
+      //   }
+      // }
+      let evOrder = orders.get(log.order_id);
       const newSpotOrderChangeEvent: SpotOrderChangeEvent =
         new SpotOrderChangeEvent({
           id: id,
-          order: order ? order : maybeExistingOrder,
+          order: evOrder, //order ? order : maybeExistingOrder,
           newBaseSize: order ? order.baseSize : "0",
           timestamp: tai64ToDate(log.timestamp).toString(),
           identifier: log.identifier,
           txId: log.tx_id,
         });
+
       orderMatchEvents.set(newSpotOrderChangeEvent.id, newSpotOrderChangeEvent);
     }
     if (isEvent("MarketCreateEvent", log, abi)) {
@@ -237,8 +232,15 @@ run(dataSource, database, async (ctx) => {
       const id = crypto.createHash("sha256").update(idSource).digest("hex");
       //console.log("Trade Event", log);
 
-      let sellOrder = await lookUpOrder(ctx.store, orders, log.sell_order_id);
-      let buyOrder = await lookUpOrder(ctx.store, orders, log.buy_order_id);
+      let sellOrder = orders.get(log.sell_order_id);
+      if (!sellOrder) {
+        sellOrder = await lookUpOrder(ctx.store, orders, log.sell_order_id);
+      }
+
+      let buyOrder = orders.get(log.buy_order_id);
+      if (!buyOrder) {
+        buyOrder = await lookUpOrder(ctx.store, orders, log.buy_order_id);
+      }
       let event = new SpotTradeEvent({
         id: id,
         baseToken: log.base_token.bits,
@@ -256,14 +258,8 @@ run(dataSource, database, async (ctx) => {
     }
   });
 
-  //let tradeEvents: SpotTradeEvent[] = [];
-
-  //await ctx.store.upsert([...orders.values()]);
-  // await ctx.store.upsert([...orderOpenEvents.values()]);
-  // }
   await ctx.store.upsert([...orders.values()]);
-  await ctx.store.save([...orderOpenEvents.values()]);
-  await ctx.store.save([...cancelEvents.values()]);
+
   await ctx.store.save([...orderMatchEvents.values()]);
   await ctx.store.save([...marketCreateEvents.values()]);
   await ctx.store.save([...spotTradeEvents.values()]);
@@ -274,7 +270,7 @@ function processOrder(log: any) {
   if (!order) {
     return new SpotOrder({
       id: log.order_id,
-      orderType: undefined,
+      orderType: null,
       trader: "0x-",
       baseToken: "0x-",
       baseSize: "0",
@@ -291,7 +287,7 @@ function processOrder(log: any) {
     timestamp: tai64ToDate(log.timestamp).toString(),
     orderType:
       order.base_size.value === 0n
-        ? undefined
+        ? null
         : order.base_size.negative
         ? SpotOrderType.sell
         : SpotOrderType.buy,
@@ -317,7 +313,7 @@ function processOrderOpenEvent(log: any, order: SpotOrder) {
 function createCancelledOrder(log: any) {
   return new SpotOrder({
     id: log.order_id,
-    orderType: undefined,
+    orderType: null,
     trader: "0x-",
     baseToken: "0x-",
     baseSize: "0",

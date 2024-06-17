@@ -1,4 +1,5 @@
-import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, StringColumn as StringColumn_} from "@subsquid/typeorm-store"
+import {Entity as Entity_, Column as Column_, PrimaryColumn as PrimaryColumn_, ManyToOne as ManyToOne_, Index as Index_, StringColumn as StringColumn_} from "@subsquid/typeorm-store"
+import {SpotOrder} from "./spotOrder.model"
 
 @Entity_()
 export class SpotOrderChangeEvent {
@@ -9,11 +10,12 @@ export class SpotOrderChangeEvent {
     @PrimaryColumn_()
     id!: string
 
-    @StringColumn_({nullable: true})
-    orderId!: string | undefined | null
+    @Index_()
+    @ManyToOne_(() => SpotOrder, {nullable: true})
+    order!: SpotOrder
 
-    @StringColumn_({nullable: true})
-    newBaseSize!: string | undefined | null
+    @StringColumn_({nullable: false})
+    newBaseSize!: string
 
     @StringColumn_({nullable: true})
     identifier!: string | undefined | null

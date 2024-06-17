@@ -1,5 +1,5 @@
-export * from "./spotMarketCreateEvent.model"
 export * from "./spotOrderChangeEvent.model"
 export * from "./spotOrder.model"
 export * from "./_spotOrderType"
+export * from "./spotMarketCreateEvent.model"
 export * from "./spotTradeEvent.model"
