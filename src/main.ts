@@ -116,10 +116,10 @@ run(dataSource, database, async (ctx) => {
       }
     }
   }
-  let logs = getDecodedLogs(receipts, abi);
+  let logs:any[] = getDecodedLogs(receipts, abi);
 
   // let createEvents: SpotMarketCreateEvent[] = [];
-  logs.forEach(async (log: any) => {
+  for (let log of logs){
     if (isEvent("OrderChangeEvent", log, abi)) {
       const eventOrder = log.order;
       const timestamp = tai64ToDate(log.timestamp);
@@ -181,20 +181,8 @@ run(dataSource, database, async (ctx) => {
               : SpotOrderType.buy,
         });
         orders.set(ammendedOrder.id, ammendedOrder);
-        await ctx.store.save(ammendedOrder);
 
-        //orders.set(maybeExistingOrder.id, maybeExistingOrder);
-      } /* else if (order) {
-        orders.set(order.id, order);
-      } */
-      // if (!log.order) {
-      //   let zeroOrder = order ? order : maybeExistingOrder;
-      //   if (zeroOrder) {
-      //     zeroOrder.baseSize = "0";
-      //     zeroOrder.orderType = undefined;
-      //     orders.set(zeroOrder.id, zeroOrder);
-      //   }
-      // }
+      }
       let evOrder = orders.get(log.order_id);
       const newSpotOrderChangeEvent: SpotOrderChangeEvent =
         new SpotOrderChangeEvent({
@@ -256,7 +244,7 @@ run(dataSource, database, async (ctx) => {
       });
       spotTradeEvents.set(event.id, event);
     }
-  });
+  };
 
   await ctx.store.upsert([...orders.values()]);
 
