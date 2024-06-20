@@ -108,6 +108,9 @@ run(dataSource, database, async (ctx) => {
 
     // let createEvents: SpotMarketCreateEvent[] = [];
     for (let log of logs) {
+        if (log.tx_id === '0x9af2dde7333a23aae57d0d99cd4a2f84c78fbc8ac092aacd786ce11f8ab2719b') {
+            console.log('LOG', log)
+        }
         if (isEvent('OrderChangeEvent', log, abi)) {
             const eventOrder = log.order
             const timestamp = tai64ToDate(log.timestamp)
@@ -174,7 +177,9 @@ run(dataSource, database, async (ctx) => {
                 identifier: log.identifier,
                 txId: log.tx_id,
             })
-
+            if (log.order_id === '0x26f351f2edf95d22b0c46506fc656f0d3b4898a9bad27d84072e7f52e18ba830') {
+                console.log('LOG', log)
+            }
             orderMatchEvents.set(newSpotOrderChangeEvent.id, newSpotOrderChangeEvent)
         }
         if (isEvent('MarketCreateEvent', log, abi)) {
@@ -205,6 +210,7 @@ run(dataSource, database, async (ctx) => {
             if (!buyOrder) {
                 buyOrder = await ctx.store.get(SpotOrder, {where: {id: log.buy_order_id}})
             }
+
             let event = new SpotTradeEvent({
                 id: id,
                 baseToken: log.base_token.bits,
