@@ -30,7 +30,8 @@ export type Enum<T, U = { [K in keyof T]: Pick<T, K> }> = Partial<T> &
 export type Option<T> = T | undefined;
 
 export type Vec<T> = T[];
-export type DecodedEvent = OrderChangeEvent | TradeEvent | MarketCreateEvent;
+// export type DecodedEvent = OrderChangeEvent | TradeEvent | MarketCreateEvent;
+export type DecodedEvent = OpenOrderEvent | CancelOrderEvent | MatchOrderEvent | TradeOrderEvent;
 export enum Error {
   AccessDenied = "AccessDenied",
   NoOrdersFound = "NoOrdersFound",
@@ -53,11 +54,11 @@ export type Identity = Enum<{
   ContractId: ContractId;
 }>;
 
-export enum OrderChangeEventIdentifier {
-  OrderOpenEvent = "OrderOpenEvent",
-  OrderCancelEvent = "OrderCancelEvent",
-  OrderMatchEvent = "OrderMatchEvent",
-}
+// export enum OrderChangeEventIdentifier {
+//   OrderOpenEvent = "OrderOpenEvent",
+//   OrderCancelEvent = "OrderCancelEvent",
+//   OrderMatchEvent = "OrderMatchEvent",
+// }
 
 export enum ReentrancyError {
   NonReentrant = "NonReentrant",
@@ -71,42 +72,131 @@ export type Market = {
   asset_id: AssetId;
   asset_decimals: BigNumberish;
 };
-export type MarketCreateEvent = {
-  asset_id: AssetId;
-  asset_decimals: BigNumberish;
-  timestamp: BigNumberish;
-  tx_id: string;
-};
+// export type MarketCreateEvent = {
+//   asset_id: AssetId;
+//   asset_decimals: BigNumberish;
+//   timestamp: BigNumberish;
+//   tx_id: string;
+// };
 
+enum AssetType {
+  Base,
+  Quote
+}
+enum OrderType {
+  Sell,
+  Buy
+}
+
+enum OrderStatus {
+  Active,
+  Closed,
+  Canceled
+}
+
+// type Order {
+// id: ID!
+// asset: String! @index
+// amount: BigInt!
+// asset_type: AssetType!
+// order_type: OrderType! @index
+// price: BigInt! @index
+// user: String! @index
+// status: OrderStatus! @index # order status
+// initial_amount: BigInt! # initial order amount
+// timestamp: String!
+// }
 export type Order = {
   id: string;
-  trader: Address;
-  base_token: AssetId;
-  base_size: I64;
-  base_price: BigNumberish;
+  asset: AssetId;
+  amount: I64;
+  asset_type: AssetType;
+  order_type: OrderType;
+  price: BigNumberish;
+  user: Address;
+  status: OrderStatus;
+  initial_amount: I64;
+  timestamp: string
 };
 
-export type OrderChangeEvent = {
+// export type OrderChangeEvent = {
+//   order_id: string;
+//   sender: Identity;
+//   timestamp: BigNumberish;
+//   identifier: OrderChangeEventIdentifier;
+//   tx_id: string;
+//   order: Option<Order>;
+// };
+export type OpenOrderEvent = {
+  // id: ID!;
   order_id: string;
-  sender: Identity;
-  timestamp: BigNumberish;
-  identifier: OrderChangeEventIdentifier;
   tx_id: string;
-  order: Option<Order>;
+  asset: AssetId;
+  amount: I64;
+  asset_type: AssetType;
+  order_type: OrderType;
+  price: BigNumberish;
+  user: Address;
+  timestamp: string;
 };
 
-export type TradeEvent = {
-  base_token: AssetId;
+
+// type TradeOrderEvent {
+// id: ID!
+// base_sell_order_id: String! @index
+// base_buy_order_id: String! @index
+// tx_id: String! @index
+// order_matcher: String! @index
+// trade_size: BigInt! @index
+// trade_price: BigInt! @index
+//   # block_height: BigInt! @index
+// timestamp: String!
+// }
+export type TradeOrderEvent = {
+  base_sell_order_id: string;
+  base_buy_order_id: string;
+  tx_id: string;
   order_matcher: Address;
-  seller: Address;
-  buyer: Address;
   trade_size: BigNumberish;
   trade_price: BigNumberish;
-  sell_order_id: string;
-  buy_order_id: string;
   timestamp: BigNumberish;
+}
+
+// type MatchOrderEvent {
+//   id: ID!
+//   order_id: String! @index
+// tx_id: String!
+// asset: String!
+// order_matcher: String!
+// owner: String!
+// counterparty: String!
+// match_size: BigInt!
+// match_price: BigInt!
+// timestamp: String!
+// }
+export type MatchOrderEvent = {
+  order_id: string;
   tx_id: string;
-};
+  asset: AssetId;
+  order_matcher: Address;
+  owner: Address;
+  counterparty: Address;
+  match_size: I64;
+  match_price: BigNumberish;
+  timestamp: BigNumberish;
+}
+
+// type CancelOrderEvent {
+//   id: ID!
+//   order_id: String! @index
+// tx_id: String!
+// timestamp: String!
+// }
+export type CancelOrderEvent = {
+  order_id: string;
+  tx_id: string;
+  timestamp: BigNumberish;
+}
 
 export type OrderbookAbiConfigurables = {
   QUOTE_TOKEN: AssetId;
