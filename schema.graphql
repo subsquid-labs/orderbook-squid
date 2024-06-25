@@ -44,7 +44,6 @@
 #   txId: ID!
 # }
 
-
 enum OrderType {
   Sell
   Buy
@@ -61,83 +60,83 @@ enum AssetType {
   Quote
 }
 
-type OpenOrderEvent {
+type OpenOrderEvent @entity {
   id: ID!
-  order_id: String! @index
-  tx_id: String!
-  asset: String! 
+  orderId: String! @index
+  txId: String!
+  asset: String!
   amount: BigInt!
-  asset_type: AssetType!
-  order_type: OrderType!
-  price: BigInt! 
-  user: String! 
+  assetType: AssetType!
+  orderType: OrderType!
+  price: BigInt!
+  user: String!
   timestamp: String!
 }
 
-type Order {
+type Order @entity {
   id: ID!
   asset: String! @index
   amount: BigInt!
-  asset_type: AssetType! 
-  order_type: OrderType! @index
+  assetType: AssetType!
+  orderType: OrderType! @index
   price: BigInt! @index
   user: String! @index
   status: OrderStatus! @index # order status
-  initial_amount: BigInt! # initial order amount 
+  initialAmount: BigInt! # initial order amount
   timestamp: String!
 }
 
-type CancelOrderEvent {
+type CancelOrderEvent @entity {
   id: ID!
-  order_id: String! @index
-  tx_id: String!
+  orderId: String! @index
+  txId: String!
   timestamp: String!
 }
 
-type MatchOrderEvent {
+type MatchOrderEvent @entity {
   id: ID!
-  order_id: String! @index
-  tx_id: String!
+  orderId: String! @index
+  txId: String!
   asset: String!
-  order_matcher: String!
+  orderMatcher: String!
   owner: String!
   counterparty: String!
-  match_size: BigInt!
-  match_price: BigInt!
+  matchSize: BigInt!
+  matchPrice: BigInt!
   timestamp: String!
 }
 
-type TradeOrderEvent {
+type TradeOrderEvent @entity {
   id: ID!
-  base_sell_order_id: String! @index
-  base_buy_order_id: String! @index
-  tx_id: String! @index
-  order_matcher: String! @index
-  trade_size: BigInt! @index
-  trade_price: BigInt! @index
+  baseSellOrderId: String! @index
+  baseBuyOrderId: String! @index
+  txId: String! @index
+  orderMatcher: String! @index
+  tradeSize: BigInt! @index
+  tradePrice: BigInt! @index
   # block_height: BigInt! @index
   timestamp: String!
 }
 
-type DepositEvent {
+type DepositEvent @entity {
   id: ID!
-  tx_id: String! @index
+  txId: String! @index
   amount: BigInt!
   asset: String! @index
   user: String! @index
   timestamp: String!
 }
 
-type WithdrawEvent {
+type WithdrawEvent @entity {
   id: ID!
-  tx_id: String! @index
+  txId: String! @index
   amount: BigInt!
   asset: String! @index
   user: String! @index
   timestamp: String!
 }
 
-type Balance {
+type Balance @entity {
   id: ID!
   amount: BigInt!
   asset: String! @index
