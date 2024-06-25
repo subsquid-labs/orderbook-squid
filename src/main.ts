@@ -21,10 +21,9 @@ import {
 } from 'fuels'
 import {OrderbookAbi__factory} from './OrderbookAbi__factory'
 import {decode} from 'punycode'
-import {SpotOrder, SpotOrderChangeEvent, SpotOrderType, SpotMarketCreateEvent, SpotTradeEvent} from './model'
+import { Order, OrderType, OpenOrderEvent, CancelOrderEvent, MatchOrderEvent, TradeOrderEvent} from './model'
 import isEvent from './utils/isEvent'
 import tai64ToDate from './utils/tai64ToDate'
-import {MarketCreateEvent, OrderChangeEvent} from './event'
 const ORDERBOOK_ID = '0x4a2ce054e3e94155f7092f7365b212f7f45105b74819c623744ebcc5d065c6ac'
 
 let abi = _abi as JsonAbi
