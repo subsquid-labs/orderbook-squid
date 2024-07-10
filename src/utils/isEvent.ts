@@ -1,6 +1,6 @@
 import { Contract, JsonAbi } from "fuels";
 
-const isEvent = (eventName: string, object: any, abi: JsonAbi) =>
+const isEvent = <T>(eventName: string, object: any, abi: JsonAbi): object is T =>
   checkFieldsInObject(object, getEventFields(eventName, abi)!);
 export default isEvent;
 

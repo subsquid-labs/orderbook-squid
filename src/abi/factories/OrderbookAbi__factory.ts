@@ -4,304 +4,16 @@
 /* eslint-disable */
 
 /*
-  Fuels version: 0.77.0
-  Forc version: 0.51.1
-  Fuel-Core version: 0.22.1
+  Fuels version: 0.89.2
+  Forc version: 0.60.0
+  Fuel-Core version: 0.27.0
 */
 
-import type {
-  BigNumberish,
-  BN,
-  BytesLike,
-  Contract,
-  DecodedValue,
-  FunctionFragment,
-  Interface,
-  InvokeFunction,
-} from "fuels";
+import { Interface, Contract, ContractFactory } from "fuels";
+import type { Provider, Account, AbstractAddress, BytesLike, DeployContractOptions, StorageSlot } from "fuels";
+import type { OrderbookAbi, OrderbookAbiInterface } from "../OrderbookAbi";
 
-export type Enum<T, U = { [K in keyof T]: Pick<T, K> }> = Partial<T> &
-  U[keyof U];
-
-/*
-    Mimics Sway Option and Vectors.
-    Vectors are treated like arrays in Typescript.
-  */
-export type Option<T> = T | undefined;
-
-export type Vec<T> = T[];
-// export type DecodedEvent = OrderChangeEvent | TradeEvent | MarketCreateEvent;
-export type DecodedEvent = OpenOrderEvent | CancelOrderEvent | MatchOrderEvent | TradeOrderEvent;
-export enum Error {
-  AccessDenied = "AccessDenied",
-  NoOrdersFound = "NoOrdersFound",
-  NoMarketFound = "NoMarketFound",
-  OrdersCantBeMatched = "OrdersCantBeMatched",
-  FirstArgumentShouldBeOrderSellSecondOrderBuy = "FirstArgumentShouldBeOrderSellSecondOrderBuy",
-  ZeroAssetAmountToSend = "ZeroAssetAmountToSend",
-  MarketAlreadyExists = "MarketAlreadyExists",
-  BadAsset = "BadAsset",
-  BadValue = "BadValue",
-  BadPrice = "BadPrice",
-  BaseSizeIsZero = "BaseSizeIsZero",
-  CannotRemoveOrderIndex = "CannotRemoveOrderIndex",
-  CannotRemoveOrderByTrader = "CannotRemoveOrderByTrader",
-  CannotRemoveOrder = "CannotRemoveOrder",
-}
-
-export type Identity = Enum<{
-  Address: Address;
-  ContractId: ContractId;
-}>;
-
-// export enum OrderChangeEventIdentifier {
-//   OrderOpenEvent = "OrderOpenEvent",
-//   OrderCancelEvent = "OrderCancelEvent",
-//   OrderMatchEvent = "OrderMatchEvent",
-// }
-
-export enum ReentrancyError {
-  NonReentrant = "NonReentrant",
-}
-
-export type Address = { value: string };
-export type AssetId = { value: string };
-export type ContractId = { value: string };
-export type I64 = { value: BigNumberish; negative: boolean };
-export type Market = {
-  asset_id: AssetId;
-  asset_decimals: BigNumberish;
-};
-// export type MarketCreateEvent = {
-//   asset_id: AssetId;
-//   asset_decimals: BigNumberish;
-//   timestamp: BigNumberish;
-//   tx_id: string;
-// };
-
-enum AssetType {
-  Base,
-  Quote
-}
-enum OrderType {
-  Sell,
-  Buy
-}
-
-enum OrderStatus {
-  Active,
-  Closed,
-  Canceled
-}
-
-// type Order {
-// id: ID!
-// asset: String! @index
-// amount: BigInt!
-// asset_type: AssetType!
-// order_type: OrderType! @index
-// price: BigInt! @index
-// user: String! @index
-// status: OrderStatus! @index # order status
-// initial_amount: BigInt! # initial order amount
-// timestamp: String!
-// }
-export type Order = {
-  id: string;
-  asset: AssetId;
-  amount: I64;
-  asset_type: AssetType;
-  order_type: OrderType;
-  price: BigNumberish;
-  user: Address;
-  status: OrderStatus;
-  initial_amount: I64;
-  timestamp: string
-};
-
-// export type OrderChangeEvent = {
-//   order_id: string;
-//   sender: Identity;
-//   timestamp: BigNumberish;
-//   identifier: OrderChangeEventIdentifier;
-//   tx_id: string;
-//   order: Option<Order>;
-// };
-export type OpenOrderEvent = {
-  // id: ID!;
-  order_id: string;
-  tx_id: string;
-  asset: AssetId;
-  amount: I64;
-  asset_type: AssetType;
-  order_type: OrderType;
-  price: BigNumberish;
-  user: Address;
-  timestamp: string;
-};
-
-
-// type TradeOrderEvent {
-// id: ID!
-// base_sell_order_id: String! @index
-// base_buy_order_id: String! @index
-// tx_id: String! @index
-// order_matcher: String! @index
-// trade_size: BigInt! @index
-// trade_price: BigInt! @index
-//   # block_height: BigInt! @index
-// timestamp: String!
-// }
-export type TradeOrderEvent = {
-  base_sell_order_id: string;
-  base_buy_order_id: string;
-  tx_id: string;
-  order_matcher: Address;
-  trade_size: BigNumberish;
-  trade_price: BigNumberish;
-  timestamp: BigNumberish;
-}
-
-// type MatchOrderEvent {
-//   id: ID!
-//   order_id: String! @index
-// tx_id: String!
-// asset: String!
-// order_matcher: String!
-// owner: String!
-// counterparty: String!
-// match_size: BigInt!
-// match_price: BigInt!
-// timestamp: String!
-// }
-export type MatchOrderEvent = {
-  order_id: string;
-  tx_id: string;
-  asset: AssetId;
-  order_matcher: Address;
-  owner: Address;
-  counterparty: Address;
-  match_size: I64;
-  match_price: BigNumberish;
-  timestamp: BigNumberish;
-}
-
-// type CancelOrderEvent {
-//   id: ID!
-//   order_id: String! @index
-// tx_id: String!
-// timestamp: String!
-// }
-export type CancelOrderEvent = {
-  order_id: string;
-  tx_id: string;
-  timestamp: BigNumberish;
-}
-
-export type OrderbookAbiConfigurables = {
-  QUOTE_TOKEN: AssetId;
-  QUOTE_TOKEN_DECIMALS: BigNumberish;
-  PRICE_DECIMALS: BigNumberish;
-};
-
-interface OrderbookAbiInterface extends Interface {
-  functions: {
-    cancel_order: FunctionFragment;
-    create_market: FunctionFragment;
-    get_configurables: FunctionFragment;
-    get_market_by_id: FunctionFragment;
-    get_order_change_events_by_order: FunctionFragment;
-    market_exists: FunctionFragment;
-    match_orders: FunctionFragment;
-    open_order: FunctionFragment;
-    order_by_id: FunctionFragment;
-    orders_by_trader: FunctionFragment;
-  };
-
-  encodeFunctionData(
-    functionFragment: "cancel_order",
-    values: [string]
-  ): Uint8Array;
-  encodeFunctionData(
-    functionFragment: "create_market",
-    values: [AssetId, BigNumberish]
-  ): Uint8Array;
-  encodeFunctionData(
-    functionFragment: "get_configurables",
-    values: []
-  ): Uint8Array;
-  encodeFunctionData(
-    functionFragment: "get_market_by_id",
-    values: [AssetId]
-  ): Uint8Array;
-  encodeFunctionData(
-    functionFragment: "get_order_change_events_by_order",
-    values: [string]
-  ): Uint8Array;
-  encodeFunctionData(
-    functionFragment: "market_exists",
-    values: [AssetId]
-  ): Uint8Array;
-  encodeFunctionData(
-    functionFragment: "match_orders",
-    values: [string, string]
-  ): Uint8Array;
-  encodeFunctionData(
-    functionFragment: "open_order",
-    values: [AssetId, I64, BigNumberish]
-  ): Uint8Array;
-  encodeFunctionData(
-    functionFragment: "order_by_id",
-    values: [string]
-  ): Uint8Array;
-  encodeFunctionData(
-    functionFragment: "orders_by_trader",
-    values: [Address]
-  ): Uint8Array;
-
-  decodeFunctionData(
-    functionFragment: "cancel_order",
-    data: BytesLike
-  ): DecodedValue;
-  decodeFunctionData(
-    functionFragment: "create_market",
-    data: BytesLike
-  ): DecodedValue;
-  decodeFunctionData(
-    functionFragment: "get_configurables",
-    data: BytesLike
-  ): DecodedValue;
-  decodeFunctionData(
-    functionFragment: "get_market_by_id",
-    data: BytesLike
-  ): DecodedValue;
-  decodeFunctionData(
-    functionFragment: "get_order_change_events_by_order",
-    data: BytesLike
-  ): DecodedValue;
-  decodeFunctionData(
-    functionFragment: "market_exists",
-    data: BytesLike
-  ): DecodedValue;
-  decodeFunctionData(
-    functionFragment: "match_orders",
-    data: BytesLike
-  ): DecodedValue;
-  decodeFunctionData(
-    functionFragment: "open_order",
-    data: BytesLike
-  ): DecodedValue;
-  decodeFunctionData(
-    functionFragment: "order_by_id",
-    data: BytesLike
-  ): DecodedValue;
-  decodeFunctionData(
-    functionFragment: "orders_by_trader",
-    data: BytesLike
-  ): DecodedValue;
-}
-
-export const abi = {
+const _abi = {
   "encoding": "1",
   "types": [
     {
@@ -467,7 +179,7 @@ export const abi = {
           "typeArguments": null
         },
         {
-          "name": "CantBatchMatch",
+          "name": "CantMatchMany",
           "type": 0,
           "typeArguments": null
         }
@@ -530,7 +242,12 @@ export const abi = {
           "typeArguments": null
         },
         {
-          "name": "AmountCannotBeZero",
+          "name": "ZeroOrderAmount",
+          "type": 0,
+          "typeArguments": null
+        },
+        {
+          "name": "ZeroLockAmount",
           "type": 0,
           "typeArguments": null
         },
@@ -569,7 +286,7 @@ export const abi = {
           "typeArguments": null
         },
         {
-          "name": "InvalidLength",
+          "name": "InvalidArrayLength",
           "type": 0,
           "typeArguments": null
         }
@@ -1044,17 +761,18 @@ export const abi = {
     {
       "inputs": [
         {
-          "name": "order0_id",
-          "type": 4,
-          "typeArguments": null
-        },
-        {
-          "name": "order1_id",
-          "type": 4,
-          "typeArguments": null
+          "name": "orders",
+          "type": 32,
+          "typeArguments": [
+            {
+              "name": "",
+              "type": 4,
+              "typeArguments": null
+            }
+          ]
         }
       ],
-      "name": "match_order_pair",
+      "name": "match_order_many",
       "output": {
         "name": "",
         "type": 0,
@@ -1073,18 +791,17 @@ export const abi = {
     {
       "inputs": [
         {
-          "name": "orders",
-          "type": 32,
-          "typeArguments": [
-            {
-              "name": "",
-              "type": 4,
-              "typeArguments": null
-            }
-          ]
+          "name": "order0_id",
+          "type": 4,
+          "typeArguments": null
+        },
+        {
+          "name": "order1_id",
+          "type": 4,
+          "typeArguments": null
         }
       ],
-      "name": "match_orders",
+      "name": "match_order_pair",
       "output": {
         "name": "",
         "type": 0,
@@ -1509,7 +1226,7 @@ export const abi = {
         "type": 20,
         "typeArguments": []
       },
-      "offset": 75936
+      "offset": 76024
     },
     {
       "name": "BASE_ASSET_DECIMALS",
@@ -1518,7 +1235,7 @@ export const abi = {
         "type": 34,
         "typeArguments": null
       },
-      "offset": 75792
+      "offset": 75872
     },
     {
       "name": "OWNER",
@@ -1527,7 +1244,7 @@ export const abi = {
         "type": 19,
         "typeArguments": []
       },
-      "offset": 75872
+      "offset": 75960
     },
     {
       "name": "PRICE_DECIMALS",
@@ -1536,7 +1253,7 @@ export const abi = {
         "type": 34,
         "typeArguments": null
       },
-      "offset": 75808
+      "offset": 75888
     },
     {
       "name": "QUOTE_ASSET",
@@ -1545,7 +1262,7 @@ export const abi = {
         "type": 20,
         "typeArguments": []
       },
-      "offset": 75968
+      "offset": 76056
     },
     {
       "name": "QUOTE_ASSET_DECIMALS",
@@ -1554,7 +1271,41 @@ export const abi = {
         "type": 34,
         "typeArguments": null
       },
-      "offset": 75816
+      "offset": 75896
     }
   ]
+};
+
+const _storageSlots: StorageSlot[] = [];
+
+export const OrderbookAbi__factory = {
+  abi: _abi,
+
+  storageSlots: _storageSlots,
+
+  createInterface(): OrderbookAbiInterface {
+    return new Interface(_abi) as unknown as OrderbookAbiInterface
+  },
+
+  connect(
+    id: string | AbstractAddress,
+    accountOrProvider: Account | Provider
+  ): OrderbookAbi {
+    return new Contract(id, _abi, accountOrProvider) as unknown as OrderbookAbi
+  },
+
+  async deployContract(
+    bytecode: BytesLike,
+    wallet: Account,
+    options: DeployContractOptions = {}
+  ): Promise<OrderbookAbi> {
+    const factory = new ContractFactory(bytecode, _abi, wallet);
+
+    const contract = await factory.deployContract({
+      storageSlots: _storageSlots,
+      ...options,
+    });
+
+    return contract as unknown as OrderbookAbi;
+  }
 }

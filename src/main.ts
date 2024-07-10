@@ -1,32 +1,40 @@
 import {run} from '@subsquid/batch-processor'
-import {augmentBlock, Block} from '@subsquid/fuel-objects'
-import {DataHandlerContext, DataSourceBuilder} from '@subsquid/fuel-stream'
+import {augmentBlock} from '@subsquid/fuel-objects'
+import {DataSourceBuilder} from '@subsquid/fuel-stream'
 import {Store, TypeormDatabase} from '@subsquid/typeorm-store'
-import {OrderbookAbi} from './OrderbookAbi'
-//import { Contract } from "./model";
 import {assertNotNull} from '@subsquid/util-internal'
-import {_abi} from './OrderbookAbi__factory'
-import {transcode} from 'buffer'
 import crypto from 'crypto'
-
+import {BN, getDecodedLogs, ReceiptLogData, ReceiptType} from 'fuels'
+import {OrderbookAbi__factory} from './abi'
 import {
-    BN,
-    Contract,
-    getDecodedLogs,
-    JsonAbi,
-    Provider,
-    ReceiptLogData,
-    ReceiptType,
-    TransactionResultReceipt,
-} from 'fuels'
-import {OrderbookAbi__factory} from './OrderbookAbi__factory'
-import {decode} from 'punycode'
-import { Order, OrderType, OpenOrderEvent, CancelOrderEvent, MatchOrderEvent, TradeOrderEvent} from './model'
+    TradeOrderEventOutput,
+    OpenOrderEventOutput,
+    MatchOrderEventOutput,
+    CancelOrderEventOutput,
+    DepositEventOutput,
+    WithdrawEventOutput,
+    IdentityOutput,
+    AssetIdOutput
+} from './abi/OrderbookAbi'
+import {
+    Order,
+    OrderType,
+    OpenOrderEvent,
+    CancelOrderEvent,
+    MatchOrderEvent,
+    TradeOrderEvent,
+    DepositEvent,
+    WithdrawEvent,
+    OrderStatus,
+    Balance,
+    AssetType
+} from './model'
 import isEvent from './utils/isEvent'
 import tai64ToDate from './utils/tai64ToDate'
-const ORDERBOOK_ID = '0x4a2ce054e3e94155f7092f7365b212f7f45105b74819c623744ebcc5d065c6ac'
+import assert from 'assert'
 
-let abi = _abi as JsonAbi
+const ORDERBOOK_ID = '0x08ca18ed550d6229f001641d43aac58e00f9eb7e25c9bea6d33716af61e43b2a'
+
 // First we create a DataSource - component,
 // that defines where to get the data and what data should we get.
 const dataSource = new DataSourceBuilder()
@@ -41,7 +49,6 @@ const dataSource = new DataSourceBuilder()
         strideConcurrency: 3,
         strideSize: 50,
     })
-
     .setFields({
         receipt: {
             contract: true,
@@ -55,17 +62,19 @@ const dataSource = new DataSourceBuilder()
             rb: true,
             digest: true,
         },
+        transaction: {
+            hash: true,
+            status: true
+        }
     })
     .setBlockRange({
-        from: 0,
+        from: 3328453,
     })
-
     .addReceipt({
         type: ['LOG_DATA'],
         transaction: true,
-        contract: ['0x4a2ce054e3e94155f7092f7365b212f7f45105b74819c623744ebcc5d065c6ac'],
+        contract: [ORDERBOOK_ID],
     })
-
     .build()
 
 const database = new TypeormDatabase()
@@ -76,17 +85,22 @@ run(dataSource, database, async (ctx) => {
     //
     // We can use `augmentBlock()` function from `@subsquid/fuel-objects`
     // to enrich block items with references to related objects.
-    let contracts: Map<String, Contract> = new Map()
     let blocks = ctx.blocks.map(augmentBlock)
+
     let orders: Map<string, Order> = new Map()
+    let balances: Map<string, Balance> = new Map()
     let tradeOrderEvents: Map<string, TradeOrderEvent> = new Map()
     let matchOrderEvents: Map<string, MatchOrderEvent> = new Map()
     let openOrderEvents: Map<string, OpenOrderEvent> = new Map()
     let cancelOrderEvents: Map<string, CancelOrderEvent> = new Map()
-    const receipts: (ReceiptLogData & {data: string})[] = []
+    let depositEvents: Map<string, DepositEvent> = new Map()
+    let withdrawEvents: Map<string, WithdrawEvent> = new Map()
+
+    const receipts: (ReceiptLogData & {data: string, time: bigint, txId: string, receiptId: string})[] = []
     for (let block of blocks) {
         for (let receipt of block.receipts) {
-            if (receipt.contract == ORDERBOOK_ID && receipt.transaction?.status.type != 'FailureStatus') {
+            let tx = assertNotNull(receipt.transaction)
+            if (receipt.contract == ORDERBOOK_ID && tx.status.type == 'SuccessStatus') {
                 receipts.push({
                     type: ReceiptType.LogData,
                     digest: assertNotNull(receipt.digest),
@@ -98,149 +112,176 @@ run(dataSource, database, async (ctx) => {
                     val0: new BN(receipt.ra?.toString()),
                     val1: new BN(receipt.rb?.toString()),
                     data: assertNotNull(receipt.data),
+                    time: tx.status.time,
+                    txId: tx.hash,
+                    receiptId: receipt.id,
                 })
             }
         }
     }
-    let logs: any[] = getDecodedLogs(receipts, abi)
 
-    // let createEvents: SpotMarketCreateEvent[] = [];
-    for (let log of logs) {
-        if (log.tx_id === '0x9af2dde7333a23aae57d0d99cd4a2f84c78fbc8ac092aacd786ce11f8ab2719b') {
-            console.log('LOG', log)
-        }
-        
-        if (isEvent('TradeEvent', log, abi)) {
-            const idSource = `${log.base_token.bits}-${log.order_matcher.bits}-${log.seller.bits}-${log.buyer.bits}-${
-                log.trade_size
-            }-${log.trade_price}-${log.sell_order_id}-${log.buy_order_id}-${tai64ToDate(log.timestamp)}-${log.tx_id}`
-            const id = crypto.createHash('sha256').update(idSource).digest('hex')
+    let logs: any[] = getDecodedLogs(receipts, OrderbookAbi__factory.abi)
+    assert(logs.length == receipts.length)
 
-            let sellOrder = orders.get(log.sell_order_id)
-            if (!sellOrder) {
-                sellOrder = await ctx.store.get(Order, {where: {id: log.sell_order_id}})
-            }
+    for (let idx = 0; idx < logs.length; idx++) {
+        let log = logs[idx]
+        let receipt = receipts[idx]
 
-            let buyOrder = orders.get(log.buy_order_id)
-            if (!buyOrder) {
-                buyOrder = await ctx.store.get(Order, {where: {id: log.buy_order_id}})
-            }
-
-            let event = new TradeOrderEvent({
-                id: id,
-                baseSellOrderId: log.base_token.bits,
-                orderMatcher: log.order_matcher.bits,
-                seller: log.seller.bits,
-                buyer: log.buyer.bits,
-                tradeSize: BigInt(log.trade_size),
-                tradePrice: BigInt(log.trade_price),
-                sellOrder: sellOrder,
-                buyOrder: buyOrder,
-                timestamp: tai64ToDate(log.timestamp).toString(),
-                txId: log.tx_id,
+        if (isEvent<OpenOrderEventOutput>('OpenOrderEvent', log, OrderbookAbi__factory.abi)) {
+            let event = new OpenOrderEvent({
+                id: receipt.receiptId,
+                orderId: log.order_id,
+                txId: receipt.txId,
+                asset: log.asset.bits,
+                amount: BigInt(log.amount.toString()),
+                assetType: log.asset_type as unknown as AssetType,
+                orderType: log.order_type as unknown as OrderType,
+                price: BigInt(log.price.toString()),
+                user: getIdentity(log.user),
+                timestamp: tai64ToDate(receipt.time).toISOString(),
             })
-            spotTradeEvents.set(event.id, event)
+            openOrderEvents.set(event.id, event)
+
+            let order = new Order({
+                id: log.order_id,
+                initialAmount: BigInt(log.amount.toString()),
+                status: OrderStatus.Active,
+                amount: BigInt(log.amount.toString()),
+                asset: log.asset.bits,
+                assetType: log.asset_type as unknown as AssetType,
+                orderType: log.order_type as unknown as OrderType,
+                price: BigInt(log.price.toString()),
+                user: getIdentity(log.user),
+                timestamp: tai64ToDate(receipt.time).toISOString(),
+            })
+            orders.set(order.id, order)
+        } else if (isEvent<TradeOrderEventOutput>('TradeOrderEvent', log, OrderbookAbi__factory.abi)) {
+            let event = new TradeOrderEvent({
+                id: receipt.receiptId,
+                baseSellOrderId: log.base_sell_order_id,
+                baseBuyOrderId: log.base_buy_order_id,
+                txId: log.tx_id,
+                orderMatcher: getIdentity(log.order_matcher),
+                tradeSize: BigInt(log.trade_size.toString()),
+                tradePrice: BigInt(log.trade_price.toString()),
+                timestamp: tai64ToDate(receipt.time).toISOString(),
+            })
+            tradeOrderEvents.set(event.id, event)
+        } else if (isEvent<MatchOrderEventOutput>('MatchOrderEvent', log, OrderbookAbi__factory.abi)) {
+            let event = new MatchOrderEvent({
+                id: receipt.receiptId,
+                orderId: log.order_id,
+                txId: receipt.txId,
+                asset: log.asset as unknown as AssetType,
+                orderMatcher: getIdentity(log.order_matcher),
+                owner: getIdentity(log.owner),
+                counterparty: getIdentity(log.counterparty),
+                matchSize: BigInt(log.match_size.toString()),
+                matchPrice: BigInt(log.match_price.toString()),
+                timestamp: tai64ToDate(receipt.time).toISOString(),
+            })
+            matchOrderEvents.set(event.id, event)
+
+            let order = assertNotNull(await lookupOrder(ctx.store, orders, log.order_id))
+            let amount = order.amount - event.matchSize
+            order.amount = amount
+            order.status = amount == 0n ? OrderStatus.Closed : OrderStatus.Active
+            order.timestamp = tai64ToDate(receipt.time).toISOString()
+        } else if (isEvent<CancelOrderEventOutput>('CancelOrderEvent', log, OrderbookAbi__factory.abi)) {
+            let event = new CancelOrderEvent({
+                id: receipt.receiptId,
+                orderId: log.order_id,
+                txId: receipt.txId,
+                timestamp: tai64ToDate(receipt.time).toISOString(),
+            })
+            cancelOrderEvents.set(event.id, event)
+
+            let order = assertNotNull(await lookupOrder(ctx.store, orders, log.order_id))
+            order.amount = 0n
+            order.status = OrderStatus.Canceled
+            order.timestamp = tai64ToDate(receipt.time).toISOString()
+        } else if (isEvent<DepositEventOutput>('DepositEvent', log, OrderbookAbi__factory.abi)) {
+            let event = new DepositEvent({
+                id: receipt.receiptId,
+                txId: receipt.txId,
+                amount: BigInt(log.amount.toString()),
+                asset: log.asset as unknown as AssetType,
+                user: getIdentity(log.user),
+                timestamp: tai64ToDate(receipt.time).toISOString(),
+            })
+            depositEvents.set(event.id, event)
+
+            let id = generateBalanceId(log.asset, log.user)
+            let balance = await lookupBalance(ctx.store, balances, id)
+            if (balance) {
+                balance.amount += BigInt(log.amount.toString())
+            } else {
+                balance = new Balance({
+                    id,
+                    amount: BigInt(log.amount.toString()),
+                    asset: log.asset as unknown as AssetType,
+                    user: getIdentity(log.user),
+                })
+                balances.set(balance.id, balance)
+            }
+        } else if (isEvent<WithdrawEventOutput>('WithdrawEvent', log, OrderbookAbi__factory.abi)) {
+            let event = new WithdrawEvent({
+                id: receipt.receiptId,
+                txId: receipt.txId,
+                amount: BigInt(log.amount.toString()),
+                asset: log.asset as unknown as AssetType,
+                user: getIdentity(log.user),
+                timestamp: tai64ToDate(receipt.time).toISOString()
+            })
+            withdrawEvents.set(event.id, event)
+
+            let id = generateBalanceId(log.asset, log.user)
+            let balance = assertNotNull(await lookupBalance(ctx.store, balances, id))
+            balance.amount -= BigInt(log.amount.toString())
         }
     }
 
     await ctx.store.upsert([...orders.values()])
-    await ctx.store.save([...orderMatchEvents.values()])
-    await ctx.store.save([...marketCreateEvents.values()])
-    await ctx.store.save([...spotTradeEvents.values()])
+    await ctx.store.upsert([...balances.values()])
+    await ctx.store.save([...tradeOrderEvents.values()])
+    await ctx.store.save([...openOrderEvents.values()])
+    await ctx.store.save([...matchOrderEvents.values()])
+    await ctx.store.save([...cancelOrderEvents.values()])
+    await ctx.store.save([...depositEvents.values()])
+    await ctx.store.save([...withdrawEvents.values()])
 })
 
-function processOrder(log: any) {
-    let order = log.order
-    if (!order) {
-        return new Order({
-            id: log.order_id,
-            orderType: null,
-            trader: '0x-',
-            baseToken: '0x-',
-            baseSize: '0',
-            basePrice: BigInt(0),
-            timestamp: tai64ToDate(log.timestamp).toString(),
-        })
-    }
-    return new Order({
-        id: log.order_id,
-        trader: order.trader.bits,
-        baseToken: order.base_token.bits,
-        baseSize: decodeI64(order.base_size),
-        basePrice: BigInt(order.base_price),
-        timestamp: tai64ToDate(log.timestamp).toString(),
-        orderType:
-            order.base_size.value === 0n ? null : order.base_size.negative ? SpotOrderType.sell : SpotOrderType.buy,
-    })
-}
 
-function processOrderOpenEvent(log: any, order: Order) {
-    //("Order Open Event", log);
-    const timestamp = tai64ToDate(log.timestamp)
-    const idSource = `${log.tx_id}-${timestamp}-${log.order_id}`
-    const id = crypto.createHash('sha256').update(idSource).digest('hex')
-    let event = new SpotOrderChangeEvent({
-        id: id,
-        newBaseSize: order.baseSize,
-        identifier: 'OrderOpenEvent',
-        timestamp: tai64ToDate(log.timestamp).toString(),
-        order: order,
-        txId: log.tx_id,
-    })
-    return event
-}
-
-function createCancelledOrder(log: any) {
-    return new Order({
-        id: log.order_id,
-        orderType: null,
-        trader: '0x-',
-        baseToken: '0x-',
-        baseSize: '0',
-        basePrice: BigInt(0),
-        timestamp: tai64ToDate(log.timestamp).toString(),
-    })
-}
-
-function processOrderCancelEvent(log: any, order: Order) {
-    const timestamp = tai64ToDate(log.timestamp)
-    const idSource = `${log.tx_id}-${timestamp}-${log.order_id}`
-    const id = crypto.createHash('sha256').update(idSource).digest('hex')
-    let event = new SpotOrderChangeEvent({
-        id: id,
-        newBaseSize: order.baseSize,
-        identifier: 'OrderCancelEvent',
-        timestamp: tai64ToDate(log.timestamp).toString(),
-        order: order,
-        txId: log.tx_id,
-    })
-    return event
-}
-
-function processOrderMatchEvent(log: any, order: Order) {
-    //console.log("Order Match Event", log);
-    const timestamp = tai64ToDate(log.timestamp)
-    const idSource = `${log.tx_id}-${timestamp}-${log.order_id}`
-    const id = crypto.createHash('sha256').update(idSource).digest('hex')
-    let event = new SpotOrderChangeEvent({
-        id: id,
-        newBaseSize: order.baseSize,
-        identifier: 'OrderCancelEvent',
-        timestamp: tai64ToDate(log.timestamp).toString(),
-        order: order,
-        txId: log.tx_id,
-    })
-    return event
-}
-
-function decodeI64(i64: {readonly value: bigint; readonly negative: boolean}) {
-    return (i64.negative ? '-' : '') + i64.value.toString()
-}
-
-async function lookUpOrder(store: Store, orders: Map<string, Order>, id: string) {
+async function lookupOrder(store: Store, orders: Map<string, Order>, id: string) {
     let order = orders.get(id)
     if (!order) {
         order = await store.get(Order, id)
+        if (order) {
+            orders.set(id, order)
+        }
     }
     return order
+}
+
+
+async function lookupBalance(store: Store, balances: Map<string, Balance>, id: string) {
+    let balance = balances.get(id)
+    if (!balance) {
+        balance = await store.get(Balance, id)
+        if (balance) {
+            balances.set(id, balance)
+        }
+    }
+    return balance
+}
+
+
+function getIdentity(output: IdentityOutput): string {
+    return assertNotNull(output.Address?.bits || output.ContractId?.bits)
+}
+
+
+function generateBalanceId(asset: AssetIdOutput, identity: IdentityOutput): string {
+    let idSource = `${asset.bits}-${getIdentity(identity)}`
+    return crypto.createHash('sha256').update(idSource).digest('hex')
 }
