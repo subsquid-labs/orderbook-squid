@@ -8,3 +8,16 @@ services:
     ports:
       - "${DB_PORT}:5432"
       # command: ["postgres", "-c", "log_statement=all"]
+  hasura:
+    image: hasura/graphql-engine:latest
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: "postgres://${DB_USER}:${DB_PASS}@db:${DB_PORT}/${DB_NAME}"
+      HASURA_GRAPHQL_ENABLE_SUBSCRIPTIONS: true
+      HASURA_GRAPHQL_ENABLE_CONSOLE: true
+      HASURA_GRAPHQL_DEV_MODE: true
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup,http-log,webhook-log,websocket-log,query-log
+      HASURA_GRAPHQL_ADMIN_SECRET: admin
+      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: public
+    restart: always
+    ports:
+      - "8080:8080"

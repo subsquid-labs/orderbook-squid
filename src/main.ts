@@ -69,7 +69,7 @@ const dataSource = new DataSourceBuilder()
         }
     })
     .setBlockRange({
-        from: 3328453,
+        from: 5200000,
     })
     .addReceipt({
         type: ['LOG_DATA'],
@@ -184,12 +184,14 @@ run(dataSource, database, async (ctx) => {
             })
             matchOrderEvents.set(event.id, event)
 
-            let order = assertNotNull(await lookupOrder(ctx.store, orders, log.order_id))
-            let amount = order.amount - event.matchSize
-            order.amount = amount
-            order.status = amount == 0n ? OrderStatus.Closed : OrderStatus.Active
-            order.timestamp = tai64ToDate(receipt.time).toISOString()
-            pubsub.publish('ORDER_UPDATED', { orderUpdated: order })
+            let order = await lookupOrder(ctx.store, orders, log.order_id)
+            if (order) {
+                let amount = order.amount - event.matchSize
+                order.amount = amount
+                order.status = amount == 0n ? OrderStatus.Closed : OrderStatus.Active
+                order.timestamp = tai64ToDate(receipt.time).toISOString()
+                pubsub.publish('ORDER_UPDATED', { orderUpdated: order })
+            }
         } else if (isEvent<CancelOrderEventOutput>('CancelOrderEvent', log, OrderbookAbi__factory.abi)) {
             let event = new CancelOrderEvent({
                 id: receipt.receiptId,
@@ -199,11 +201,13 @@ run(dataSource, database, async (ctx) => {
             })
             cancelOrderEvents.set(event.id, event)
 
-            let order = assertNotNull(await lookupOrder(ctx.store, orders, log.order_id))
-            order.amount = 0n
-            order.status = OrderStatus.Canceled
-            order.timestamp = tai64ToDate(receipt.time).toISOString()
-            pubsub.publish('ORDER_UPDATED', { orderUpdated: order })
+            let order = await lookupOrder(ctx.store, orders, log.order_id)
+            if (order) {
+                order.amount = 0n
+                order.status = OrderStatus.Canceled
+                order.timestamp = tai64ToDate(receipt.time).toISOString()
+                pubsub.publish('ORDER_UPDATED', { orderUpdated: order })
+            }
         } else if (isEvent<DepositEventOutput>('DepositEvent', log, OrderbookAbi__factory.abi)) {
             let event = new DepositEvent({
                 id: receipt.receiptId,
