@@ -1,5 +1,5 @@
-module.exports = class Data1720455966984 {
-    name = 'Data1720455966984'
+module.exports = class Data1721216673507 {
+    name = 'Data1721216673507'
 
     async up(db) {
         await db.query(`CREATE TABLE "open_order_event" ("id" character varying NOT NULL, "order_id" text NOT NULL, "tx_id" text NOT NULL, "asset" text NOT NULL, "amount" numeric NOT NULL, "asset_type" character varying(5) NOT NULL, "order_type" character varying(4) NOT NULL, "price" numeric NOT NULL, "user" text NOT NULL, "timestamp" text NOT NULL, CONSTRAINT "PK_b7c1feb45e2863952c194e45734" PRIMARY KEY ("id"))`)
@@ -32,6 +32,9 @@ module.exports = class Data1720455966984 {
         await db.query(`CREATE TABLE "balance" ("id" character varying NOT NULL, "amount" numeric NOT NULL, "asset" text NOT NULL, "user" text NOT NULL, CONSTRAINT "PK_079dddd31a81672e8143a649ca0" PRIMARY KEY ("id"))`)
         await db.query(`CREATE INDEX "IDX_a0025894b0915d8a63f97173ce" ON "balance" ("asset") `)
         await db.query(`CREATE INDEX "IDX_a7473c61c7a2127dee44379985" ON "balance" ("user") `)
+        await db.query(`CREATE TABLE "subscription" ("id" character varying NOT NULL, "order_updated_id" character varying, CONSTRAINT "PK_8c3e00ebd02103caa1174cd5d9d" PRIMARY KEY ("id"))`)
+        await db.query(`CREATE INDEX "IDX_ed9ca23038ed4c332c83bcf5f4" ON "subscription" ("order_updated_id") `)
+        await db.query(`ALTER TABLE "subscription" ADD CONSTRAINT "FK_ed9ca23038ed4c332c83bcf5f4f" FOREIGN KEY ("order_updated_id") REFERENCES "order"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`)
     }
 
     async down(db) {
@@ -65,5 +68,8 @@ module.exports = class Data1720455966984 {
         await db.query(`DROP TABLE "balance"`)
         await db.query(`DROP INDEX "public"."IDX_a0025894b0915d8a63f97173ce"`)
         await db.query(`DROP INDEX "public"."IDX_a7473c61c7a2127dee44379985"`)
+        await db.query(`DROP TABLE "subscription"`)
+        await db.query(`DROP INDEX "public"."IDX_ed9ca23038ed4c332c83bcf5f4"`)
+        await db.query(`ALTER TABLE "subscription" DROP CONSTRAINT "FK_ed9ca23038ed4c332c83bcf5f4f"`)
     }
 }
